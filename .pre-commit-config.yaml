@@ -1,0 +1,18 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml #检查 YAML 文件的语法是否正确
+
+  - repo: local
+    hooks:
+    -   id: check
+        name: check
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+    -   id : format
+        name: format
+        entry: uv run ruff format
+        language: system
+        types: [python]
