@@ -1,54 +1,67 @@
 """For Agent."""
 
-from deepagents import CompiledSubAgent, create_deep_agent
-from dotenv import load_dotenv
+from collections.abc import Callable, Sequence
+from typing import Any
+
+from deepagents import CompiledSubAgent, SubAgent, create_deep_agent
+from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.tools import BaseTool
+from langgraph.store.memory import InMemoryStore
 
-load_dotenv()
+from overview import config as cfg
+
+Inmemory_store = InMemoryStore()
 
 
-def main_agent(model: str | BaseChatModel):
+def main_agent(
+    model: str | BaseChatModel,
+    subagents: list[SubAgent | CompiledSubAgent] | None = None,
+    tools: Sequence[BaseTool | Callable | dict[str, Any]] | None = None,
+):
     """Agent for taking a overview of paper."""
-    from overview.tools.search import ddgs_search
+    # from overview.tools.search import ddgs_search
 
-    research_instructions = """You are an expert researcher. Your job is to conduct thorough research and then write a polished report.
-
-    You have access to an internet search tool as your primary means of gathering information.
-
-    ## `ddgs_search`
-
-    Use this to run an internet search for a given query. You can specify the max number of results to return, the topic, and whether raw content should be included.
-    """
-
-    agent = create_deep_agent(tools=[ddgs_search], system_prompt=research_instructions)
-    ...
+    main_agent = create_deep_agent(
+        model=model,
+        tools=tools,
+        system_prompt=cfg.MAIN_AGENT_PROMPT,
+        subagents=subagents,
+        store=Inmemory_store,
+        backend=lambda rt: CompositeBackend(
+            default=StateBackend(rt),
+            routes={
+                "/memory/": StoreBackend(rt),
+            },
+        ),
+    )
+    return main_agent
 
 
 def search_agent(model: str | BaseChatModel):
     """Agent for search from internet and return the answer."""
-    from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
+    from deepagents.backends import CompositeBackend, StoreBackend
     from deepagents.middleware import FilesystemMiddleware
     from langchain.agents import create_agent
-    from langgraph.store.memory import InMemoryStore
 
     from overview.tools.search import ddgs_search
 
-    store = InMemoryStore()
-    agent_graph = create_agent(
+    agent = create_agent(
         model=model,
         tools=[ddgs_search],
-        system_prompt="You are a specialized agent for data analysis...",
+        system_prompt=cfg.SEARCH_AGENT_PROMPT,
         middleware=[
             FilesystemMiddleware(
+                system_prompt="Use the write your Summarize in /search/ dirctory.",
                 backend=lambda rt: CompositeBackend(
                     default=StateBackend(rt),
-                    routes={"/memories/": StoreBackend(rt)},
+                    routes={"/search/": StoreBackend(rt)},
                 ),
             ),
         ],
-        store=store,
+        store=Inmemory_store,
     )
-    return agent_graph
+    return agent
 
 
 def search_subagent(model: str | BaseChatModel):
@@ -56,7 +69,7 @@ def search_subagent(model: str | BaseChatModel):
     agent_graph = search_agent(model)
     agent_subgraph = CompiledSubAgent(
         name="web-search-agent",
-        description="An agent that searches the web for information.",
+        description="An agent that searches the web for information.and the answer will be written to /search/",
         runnable=agent_graph,
     )
     return agent_subgraph
@@ -65,11 +78,14 @@ def search_subagent(model: str | BaseChatModel):
 if __name__ == "__main__":
     from pprint import pprint
 
+    from dotenv import load_dotenv
     from langchain_community.chat_models import ChatTongyi
 
+    load_dotenv()
     model = ChatTongyi(model="qwen-max")
-    agent = search_agent(model)
-    res = agent.invoke({
-        "messages": [{"role": "user", "content": "湖南大学是什么大学?"}]
+    subagent = search_subagent(model)
+    mainagent = main_agent(model, subagents=[subagent])
+    res = mainagent.invoke({
+        "messages": "使用subagent搜索什么是qwen，并且返回在search文件夹中的raw data"
     })
     pprint(res)
