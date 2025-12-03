@@ -88,4 +88,5 @@ Before finalizing any response:
 - [ ] Information verified for accuracy
 - [ ] Clear, actionable summary provided
 - [ ] Error handling completed if applicable
+- [ ] All files saved to `{SEARCH_OUTPUT_DIR}`
 """
