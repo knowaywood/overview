@@ -31,10 +31,17 @@ image.save("mermaid_graph.png")
 
 ## TODO：
 
-- [ ] OCR:  pdf => .md  包括如何部署模型以及遇到的问题。
+- [x] OCR:  pdf => .md  包括如何部署模型以及遇到的问题。
+  - [ ] 合并代码
 - [ ] prompt: 研究如何写prompt （比较简单），
-- [ ] search tool: 使用arXiv api获取到pdf或其他格式
-- [ ] paper模块分析: 分析论文的模块、格式，以及如何分配模块的weight（需要分享）
+- [x] search tool: 使用arXiv api获取到pdf或其他格式
+  - [x] 合并代码
+- [x] paper模块分析: 分析论文的模块、格式，以及如何分配模块的weight（需要分享）
+  - [ ] 合并代码（根据paper格式embedding）
+- [ ] 利用SQL，存储用户偏好
+- [ ] 新的memory管理方法（）
+- [ ] 修改sub agent保存逻辑，使用确定的方式保存一手数据。
+- [ ] 加入cache机制
 
 ## PP-structureV3 本地部署
 使用wsl:Ubuntu作为运行环境,或参考[链接](https://www.paddleocr.ai/v3.0.0/version2.x/ppocr/environment.html)配置环境

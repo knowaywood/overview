@@ -30,9 +30,7 @@ def main_agent(
         store=Inmemory_store,
         backend=lambda rt: CompositeBackend(
             default=StateBackend(rt),
-            routes={
-                "/memory/": StoreBackend(rt),
-            },
+            routes={"/memory/": StoreBackend(rt), "/search/": StoreBackend(rt)},
         ),
     )
     return main_agent
@@ -85,7 +83,5 @@ if __name__ == "__main__":
     model = ChatTongyi(model="qwen-max")
     subagent = search_subagent(model)
     mainagent = main_agent(model, subagents=[subagent])
-    res = mainagent.invoke({
-        "messages": "使用subagent搜索什么是qwen，并且返回在search文件夹中的raw data"
-    })
+    res = mainagent.invoke({"messages": "使用subagent搜索什么是qwen"})
     pprint(res)
