@@ -23,7 +23,6 @@ class PaperMetadata:
     concepts: List[str]
     citation_trend_last_3y: Dict[int, int]
     abstract_full: Optional[str]
-    abstract_preview: str
 
 
 class PaperMetaAnalyzer:
@@ -36,10 +35,15 @@ class PaperMetaAnalyzer:
     DOI_PATTERN = r"\b(10\.\d{4,9}/[-._;()/:A-Z0-9]+)"
     ARXIV_PATTERN = r"arXiv:(\d{4}\.\d{4,5})"
 
-    def __init__(self, file_path: str) -> None:
+    def __init__(self, file_paths: list[str]) -> None:
         self.session = requests.Session()
         self.session.headers.update(self.HEADERS)
-        self.metadata = self.get_paper_metadata(file_path)
+
+        meta_data = []
+        for file_path in file_paths:
+            meta_data.append(self.get_paper_metadata(file_path))
+            print(f"DONE : {file_path}\n")
+        self.metadata = meta_data
 
     @staticmethod
     def reconstruct_abstract(
@@ -132,7 +136,6 @@ class PaperMetaAnalyzer:
     def query_by_arxiv(self, arxiv_id: str) -> Optional[Dict[str, Any]]:
         """通过arXiv ID查询OpenAlex"""
         api_url = f"https://api.openalex.org/works?search={arxiv_id}"
-        print(f"🔍 [arXiv模式] 全库搜索 ID: {arxiv_id}")
         return self._fetch_metadata(api_url, mode="search")
 
     def _fetch_metadata(self, url: str, mode: str) -> Optional[Dict[str, Any]]:
@@ -191,7 +194,6 @@ class PaperMetaAnalyzer:
             concepts=self._extract_concepts(result),
             citation_trend_last_3y=citation_trend,
             abstract_full=abstract_text,
-            abstract_preview=abstract_preview,
         )
 
     def _extract_institution(self, result: Dict[str, Any]) -> str:

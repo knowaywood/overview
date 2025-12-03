@@ -1,12 +1,14 @@
 """Configuration module for agent prompts and system settings."""
 
-from typing import Final, TypedDict
+from typing import Annotated, Final, Sequence, TypedDict
 
+from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
 
 class BaseState(TypedDict):
     """Base state structure for agent communication."""
 
-    state: str
+    messages: Annotated[Sequence[BaseMessage], add_messages]
 
 
 # Constants for prompt configuration

@@ -42,6 +42,7 @@ image.save("mermaid_graph.png")
 - [ ] 新的memory管理方法（）
 - [ ] 修改sub agent保存逻辑，使用确定的方式保存一手数据。
 - [ ] 加入cache机制
+- [x] 得到paper的meta data
 
 ## PP-structureV3 本地部署
 使用wsl:Ubuntu作为运行环境,或参考[链接](https://www.paddleocr.ai/v3.0.0/version2.x/ppocr/environment.html)配置环境

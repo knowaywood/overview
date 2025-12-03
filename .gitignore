@@ -9,3 +9,8 @@ wheels/
 
 # Virtual environments
 .venv
+examples/Example/vectStore/chroma.sqlite3
+examples/Example/vectStore/5680038c-d7fb-48bb-b014-b5141a73deb5/data_level0.bin
+examples/Example/vectStore/5680038c-d7fb-48bb-b014-b5141a73deb5/header.bin
+examples/Example/vectStore/5680038c-d7fb-48bb-b014-b5141a73deb5/length.bin
+examples/Example/vectStore/5680038c-d7fb-48bb-b014-b5141a73deb5/link_lists.bin

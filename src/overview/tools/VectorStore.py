@@ -137,18 +137,23 @@ class VectorStore(StandVectorStore):
             name (str): The name of the vector store. Defaults to "mathdata".
 
         """
-        super().__init__()
+        self.embedding_model = DashScopeEmbeddings(model="text-embedding-v3")
+        self.vec_store = Chroma(name, self.embedding_model, persist_directory=store_dir)
+        self.retriever = self.vec_store.as_retriever(
+            search_type="mmr", search_kwargs={"k": 10}
+        )
+        self.retriever_tool = Tool(
+            name="retriever_tool",
+            func=self._retriever_tool_func,
+            description="This tool searches and returns more information of paper data.",
+        )
         self.md_dir = md_dir
         self.store_dir = store_dir
-        self.vec_store = Chroma(name, self.embedding_model, persist_directory=store_dir)
         self.sync_store()
 
     def sync_store(self) -> None:
         """Synchronize the vector store with the markdown files in the specified directory. It identifies new files to add and existing files to delete from the store."""
-        try:
-            all_metadata = self.vec_store.get(include=["metadatas", "ids"])
-        except Exception:
-            all_metadata = {"metadatas": [], "ids": []}
+        all_metadata = self.vec_store.get(include=["metadatas"])
         metadata_docs = all_metadata["metadatas"]
         adds, dels = add_del_files(metadata_docs, self.md_dir)
         if adds:
@@ -161,7 +166,6 @@ class VectorStore(StandVectorStore):
             doc_pages = loader.load()
             text_spliter = MarkdownTextSplitter(chunk_size=150, chunk_overlap=20)
             doc_chunk = text_spliter.split_documents(doc_pages)
-            print(len(doc_chunk), doc_chunk[0] if doc_chunk else None)
             self.vec_store.add_documents(doc_chunk)
             print(f"vec_store added: {adds}\n")
         if dels:
