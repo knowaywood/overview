@@ -1,0 +1,136 @@
+LangSmith 是一个用于开发、调试和部署大语言模型应用的平台。
+它可以帮助开发者追踪每一次 LLM 调用，查看 Prompt、输出、Token 消耗和错误信息。
+
+LangGraph 是一个用来编排有状态 LLM 工作流的框架。
+它非常适合构建多步骤、多 Agent、可循环的推理流程，并且可以和 LangSmith 无缝集成进行可观测性监控。
+
+DashScope（通义千问）是阿里云提供的大模型平台，包含通义千问系列 LLM 和文本向量嵌入模型等能力。
+通过 LangChain 的 ChatTongyi 和 DashScopeEmbeddings 即可方便地集成到 Python 应用中。
+
+s noted in Table 1, a self-attention layer connects all positions with a constant number of sequentially executed operations, whereas a recurrent layer requires O(n) sequential operations. In terms of computational complexity, self-attention layers are faster than recurrent layers when the sequence length n is smaller than the representation dimensionality d, which is most often the case with sentence representations used by state-of-the-art models in machine translations, such as word-piece [38] and byte-pair [31] representations. To improve computational performance for tasks involving very long sequences, self-attention could be restricted to considering only a neighborhood of size r in the input sequence centered around the respective output position. This would increase the maximum path length to $O(n/r)$ 1. We plan to investigate this approach further in future work.
+
+A single convolutional layer with kernel width $k<n$ does not connect all pairs of input and output positions. Doing so requires a stack of $O(n/k)$ |convolutional layers in the case of contiguous kernels,or $O(l o g_{k}(n))$ in the case of dilated convolutions [18], increasing the length of the longest paths between any two positions in the network. Convolutional layers are generally more expensive than recurrent layers, by a factor of k. Separable convolutions [6], however, decrease the complexity considerably, to $\vec{O}(k\cdot n\cdot d+n\cdot d^{2})$ Even with $k=n$ , however, the complexity of a separable convolution is equal to the combination of a self-attention layer and a point-wise feed-forward layer,the approach we take in our model.
+
+
+
+As side benefit, self-attention could yield more interpretable models. We inspect attention distributions from our models and present and discuss examples in the appendix. Not only do individual attention heads clearly learn to perform different tasks, many appear to exhibit behavior related to the syntactic and semantic structure of the sentences.
+
+
+
+## 5 Training
+
+This section describes the training regime for our models.
+
+### 5.1 Training Data and Batching
+
+We trained on the standard WMT 2014 English-German dataset consisting of about 4.5 million sentence pairs. Sentences were encoded using byte-pair encoding [3], which has a shared sourcetarget vocabulary of about 37000 tokens. For English-French, we used the significantly larger WMT 2014 English-French dataset consisting of 36M sentences and split tokens into a 32000 word-piece vocabulary [38]. Sentence pairs were batched together by approximate sequence length. Each training batch contained a set of sentence pairs containing approximately 25000 source tokens and 25000target tokens.
+
+
+
+### 5.2 Hardware and Schedule
+
+We trained our models on one machine with 8 NVIDIA P100 GPUs. For our base models using the hyperparameters described throughout the paper, each training step took about 0.4 seconds. We trained the base models for a total of 100,000 steps or 12 hours. For our big models,(described on the bottom line of table 3), step time was 1.0 seconds. The big models were trained for 300,000 steps (3.5 days).
+
+
+
+### 5.3 Optimizer
+
+We used the Adam optimizer [20] with $\beta_{1}=0.9,\beta_{2}=0.98\;\mathrm{a n d}\;\epsilon=10^{-9}$ . We varied the learning rate over the course of training, according to the formula:
+
+$$l r a t e=d_{\mathsf{m o d e l}}^{-0.5}\cdot\operatorname*{m i n}(s t e p\_n u m^{-0.5},s t e p\_n u m\cdot w a r m u p\_s t e p s^{-1.5})$$
+
+This corresponds to increassing the learning rate linearly for the first warmup_steps training steps,and decreasing it thereafter proportionally to the inverse square root of the step number. We used warmup_$\_s t e p s=4000$
+
+
+
+### 5.4 Regularization
+
+We employ three types of regularization during training:<div style="text-align: center;">Table 2: The Transformer achieves better BLEU scores than previous state-of-the-art models on the English-to-German and English-to-French newstest2014 tests at a fraction of the training cost.</div>
+
+
+
+<div style="text-align: center;"><html><body><table border="1"><tr><td rowspan="2">Model</td><td colspan="2">BLEU</td><td colspan="2">Training Cost (FLOPs)</td></tr><tr><td>EN-DE</td><td>EN-FR</td><td>EN-DE</td><td>EN-FR</td></tr><tr><td>ByteNet [18]</td><td>23.75</td><td></td><td></td><td></td></tr><tr><td>28.4 41.8</td><td></td><td>39.2</td><td></td><td>1.0 · 1020</td></tr><tr><td>GNMT + RL [38]</td><td>24.6</td><td>39.92</td><td>2.3· 1019</td><td>1.4 · 1020</td></tr><tr><td>ConvS2S [9]</td><td>25.16</td><td>40.46</td><td>9.6 · 1018</td><td>1.5· 1020</td></tr><tr><td>MoE [32]</td><td>26.03</td><td>40.56</td><td>2.0· 1019</td><td>1.2. 1020</td></tr><tr><td>Deep-Att + PosUnk Ensemble [39]</td><td></td><td>40.4</td><td></td><td>8.0 · 1020</td></tr><tr><td>GNMT + RL Ensemble [38]</td><td>26.30</td><td>41.16</td><td>1.8·1020</td><td>1.1 · 1021</td></tr><tr><td>ConvS2S Ensemble [9]</td><td>26.36</td><td>41.29</td><td>7.7 ·1019</td><td>1.2·1021</td></tr><tr><td>Transformer (base model)</td><td>27.3</td><td>38.1</td><td></td><td></td></tr><tr><td>Transformer (big)</td><td>28.4</td><td>41.8</td><td></td><td></td></tr></table></body></html></div>
+
+
+Residual Dropout We apply dropout [33] to the output of each sub-layer, before it is added to the sub-layer input and normalized.In addition, we apply dropout to the sums of the embeddings and the positional encodings in both the encoder and decoder stacks. For the base model, we use a rate of
+
+$\bar{{P}}_{{d r o p}}=0.1$
+
+
+
+Label Smoothing During training, we employed label smoothing of value $\epsilon_{l s}=0.1\:[36]$ .This hurts perplexity, as the model learns to be more unsure, but improves accuracy and BLEU score.
+
+## 6 Results
+
+### 6.1 Machine Translation
+
+On the WMT 2014 English-to-German translation task, the big transformer model (Transformer (big)in Table 2) outperforms the best previously reported models (including ensembles) by more than 2.0BLEU, establishing a new state-of-the-art BLEU score of 28.4. The configuration of this model is listed in the bottom line of Table 3. Training took 3.5 days on 8 P100 GPUs. Even our base model surpasses all previously published models and ensembles, at a fraction of the training cost of any of the competitive models.
+
+
+
+On the WMT 2014 English-to-French translation task, our big model achieves a BLEU score of 41.0,outperforming all of the previously published single models, at less than 1/4 the training cost of the previous state-of-the-art model. The Transformer (big) model trained for English-to-French used dropout rate $P_{d r o p}=0.1$ ., instead of 0.3.
+
+
+
+For the base models, we used a single model obtained by averaging the last 5 checkpoints, which were written at 10-minute intervals. For the big models, we averaged the last 20 checkpoints. We used beam search with a beam size of 4 and length penalty $\alpha=0.6\;[38]$ |. These hyperparameters were chosen after experimentation on the development set. We set the maximum output length during inference to input length + 50, but terminate early when possible [38].
+
+Table 2 summarizes our results and compares our translation quality and training costs to other model architectures from the literature. We estimate the number of floating point operations used to train a model by multiplying the training time, the number of GPUs used, and an estimate of the sustained single-precision floating-point capacity of each GPU5.
+
+
+
+### 6.2 Model Variations
+
+To evaluate the importance of different components of the Transformer, we varied our base model in different ways, measuring the change in performance on English-to-German translation on the <div style="text-align: center;">Table 3: Variations on the Transformer architecture, Unlisted values are identical to those of the base model. All metrics are on the English-to-German translation development set, newstest2013. Listed perplexities are per-wordpiece, according to our byte-pair encoding, and should not be compared to per-word perplexities. </div>
+
+
+
+<div style="text-align: center;"><html><body><table border="1"><tr><td>N</td><td>h</td><td>params ×106</td><td>$d_{\mathrm{m o d e l}}$</td><td>$d_{\mathrm{f f}}$</td><td>$d_{k}$</td><td>$d_{v}$</td><td>$P_{d r o p}$</td><td>$\epsilon_{l s}$</td><td>steps 100K</td><td>(dev)</td><td>(dev)</td></tr><tr><td>base</td><td>6</td><td>512</td><td>2048</td><td>8</td><td>64</td><td>64 512 128</td><td>0.1</td><td>0.1</td><td>4.92 5.29</td><td>25.8 24.9</td><td>65</td></tr><tr><td>(A)</td><td>1 4</td><td>512 128 32</td><td></td><td></td><td></td><td></td><td>5.00 4.91 5.01</td><td>25.5 25.8 25.4</td><td>16 32</td><td>32 16</td><td></td></tr><tr><td>16</td><td></td><td>(B)</td><td>16 32</td><td></td><td>5.16 5.01</td><td>25.1</td><td>58 60</td><td>25.4</td><td></td><td></td><td></td></tr><tr><td>(C)</td><td>2 4</td><td>6.11 5.19</td><td>23.7 25.3 25.5</td><td>36 50 80</td><td>8</td><td>4.88 5.75 4.66</td><td>256 1024</td><td>32 128</td><td>32 128</td><td>24.5 26.0 25.4</td><td>28 168</td></tr><tr><td>(D)</td><td>0.0 0.2</td><td>5.77 4.95</td><td>25.5 25.3 25.7</td><td>0.0 0.2</td><td>4.67 5.47</td><td>(E) big</td><td>positional embedding instead of sinusoids</td><td>4.92 4.33</td><td>25.7</td><td></td><td></td></tr><tr><td>6</td><td colspan="7">1024</td><td>4096</td><td>16</td><td>0.3</td><td>300K</td></tr></table></body></html></div>
+
+
+development set, newstest2013. We used beam search as described in the previous section, but no checkpoint averaging. We present these results in Table 3.
+
+
+
+In Table 3 rows (A), we vary the number of attention heads and the attention key and value dimensios,keeping the amount of computation constant, as described in Section 3.2.2. While single-head attention is 0.9 BLEU worse than the best setting, quality also drops off with too many heads.
+
+In Table 3 rows (B), we observe that reducing the attention key size $d_{k}$ hurts model quality. This suggests that determining compatibility is not easy and that a more sophisticated compatibility function than dot product may be beneficial. We further observe in rows (C) and (D) that, as expected,bigger models are better, and dropout is very helpful in avoiding over-fi tting. In row (E) we replace our sinusoidal positional encoding with learned positional embeddings [9], and observe nearly identical results to the base model.
+
+
+
+### 6.3 English Constituency Parsing
+
+To evaluate if the Transformer can generalize to other tasks we performed experiments on English constituency parsing. This task presents specific challenges: the output is subject to strong structural constraints and is significantly longer than the input. Furthermore, RNN sequence-to-sequence models have not been able to attain state-of-the-art results in small-data regimes [37].
+
+We trained a 4-layer transformer with $d_{m o d e l}=1024$ on the Wall Street Journal (WSJ) portion of the Penn Treebank [25], about 40K training sentences. We also trained it in a semi-supervised setting,using the larger high-confidence and BerkleyParser corpora from with approximately 17M sentences [37]. We used a vocabulary of 16K tokens for the WSJ only setting and a vocabulary of 32K tokens for the semi-supervised setting.
+
+
+
+We performed only a small number of experiments to select the dropout, both attention and residual (section 5.4), learning rates and beam size on the Section 22 development set, all other parameters remained unchanged from the English-to-German base translation model. During inference, we <div style="text-align: center;">Table 4: The Transformer generalizes well to English constituency parsing (Results are on Section 23of WSJ) </div>
+
+
+
+<div style="text-align: center;"><html><body><table border="1"><tr><td>Parser</td><td>Training</td><td>WSJ 23 F1</td></tr><tr><td>Vinyals & Kaiser el al. (2014) [37]</td><td>WSJ only, discriminative</td><td>88.3</td></tr><tr><td>Petrov et al. (2006) [29]</td><td>WSJ only, discriminative</td><td>90.4</td></tr><tr><td>Zhu et al. (2013) [40]</td><td>WSJ only, discriminative</td><td>90.4</td></tr><tr><td>Dyer et al. (2016) [8]</td><td>WSJ only, discriminative</td><td>91.7</td></tr><tr><td>Transformer (4 layers) Zhu et al. (2013) [40]</td><td>WSJ only, discriminative</td><td>91.3</td></tr><tr><td>semi-supervised</td><td>91.3</td><td></td></tr><tr><td>Huang & Harper (2009) [14]</td><td>semi-supervised semi-supervised</td><td>91.3 92.1</td></tr><tr><td>Vinyals & Kaiser el al. (2014) [37]</td><td>semi-supervised</td><td>92.1</td></tr><tr><td>Transformer (4 layers) Luong et al. (2015) [23]</td><td>semi-supervised multi-task</td><td>92.7 93.0</td></tr><tr><td>Dyer et al. (2016) [8]</td><td>generative</td><td>93.3</td></tr></table></body></html></div>
+
+
+increased the maximum output length to input length + 300. We used a beam size of 21 and $\alpha=0.3$ for both WSJ only and the semi-supervised setting.
+
+
+
+Our results in Table 4 show that despite the lack of task-specific tuning our model performs surprisingly well, yielding better results than all previously reported models with the exception of the Recurrent Neural Network Grammar [8].
+
+
+
+In contrast to RNN sequence-to-sequence models [37], the Transformer outperforms the BerkeleyParser [29] even when training only on the WSJ training set of 40K sentences.
+
+## 7 Conclusion
+
+In this work, we presented the Transformer, the first sequence transduction model based entirely on attention, replacing the recurrent layers most commonly used in encoder-decoder architectures with multi-headed self-attention.
+
+
+
+For translation tasks, the Transformer can be trained significantly faster than architectures based on recurrent or convolutional layers. On both WMT 2014 English-to-German and WMT 2014English-to-French translation tasks, we achieve a new state of the art. In the former task our best model outperforms even all previously reported ensembles.
+
+
+
+We are excited about the future of attention-based models and plan to apply them to other tasks. We plan to extend the Transformer to problems involving input and output modalities other than text and to investigate local, restricted attention mechanisms to efficiently handle large inputs and outputs such as images, audio and video. Making generation less sequential is another research goals of ours.The code we used to train and evaluate our models is available at https://github.com/tensorflow/tensor2tensor.
+
