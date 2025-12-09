@@ -6,16 +6,16 @@ _pipeline_instance = None
 
 
 class Batch:
-    def __init__(input_dir: str, output_dir: str):
-        pass
-        
-
-    def pdf_to_md(input_dir: str, output_dir: str):
+    def __init__(self, input_dir: str, output_dir: str):
 
         global _pipeline_instance
         if _pipeline_instance is None:
             _pipeline_instance = PPStructureV3()
             print("模型加载完成")
+
+        self.pdf_to_md(input_dir, output_dir)
+
+    def pdf_to_md(self, input_dir: str, output_dir: str):
 
         input_path = Path(input_dir)
         output_path = Path(output_dir)
@@ -63,8 +63,7 @@ class Batch:
 
 
 if __name__ == "__main__":
-    batch = Batch()
-    batch.pdf_to_md(
+    batch = Batch(
         "/home/aryovel/overview/overview/examples/Example/pdf",
         "/home/aryovel/overview/overview/examples/Example/md",
     )
