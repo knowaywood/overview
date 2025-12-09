@@ -79,9 +79,13 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
     from langchain_community.chat_models import ChatTongyi
 
+    from overview.tools.FS import read_file
+
     load_dotenv()
     model = ChatTongyi(model="qwen-max")
     subagent = search_subagent(model)
-    mainagent = main_agent(model, subagents=[subagent])
-    res = mainagent.invoke({"messages": "使用subagent搜索什么是qwen"})
+    mainagent = main_agent(model, subagents=[subagent], tools=[read_file])
+    res = mainagent.invoke({
+        "messages": "读取文件/home/dministrator/git_clone/overview/.env_copy的内容"
+    })
     pprint(res)

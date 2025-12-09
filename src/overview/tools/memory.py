@@ -2,24 +2,40 @@
 
 import json
 
-from langchain_core.messages import convert_to_messages
+from langchain_core.messages import (
+    messages_from_dict,
+    messages_to_dict,
+)
 
 import overview.config as cfg
 
 
-def save(path: str, history: cfg.BaseState) -> None:
-    state_json = history.model_dump_json()
+def save(path: str, state: cfg.BaseState) -> None:
+    """Save chat memory to hard drive."""
+    serialized_messages = messages_to_dict(state["messages"])
+
+    data = {
+        "messages": serialized_messages,
+    }
+
+    # 3. 写入文件
     with open(path, "w", encoding="utf-8") as f:
-        f.write(state_json)
-    print(f"✅ Save history to {path}")
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 
 def resume(path: str) -> cfg.BaseState:
+    """Resume chat memory from hard drive."""
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-            if "messages" in data:
-                data["messages"] = convert_to_messages(data["messages"])
-        return cfg.BaseState(**data)
+            data["messages"] = messages_from_dict(data["messages"])
+
+        return data
     except FileNotFoundError as e:
         raise e
+
+
+if __name__ == "__main__":
+    from pprint import pprint
+
+    pprint(resume("history.json"))

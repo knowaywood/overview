@@ -3223,7 +3223,6 @@ dependencies = [
     { name = "langchain-text-splitters" },
     { name = "langgraph" },
     { name = "markdown" },
-    { name = "pydantic" },
     { name = "pymupdf" },
     { name = "unstructured" },
 ]
@@ -3253,7 +3252,6 @@ requires-dist = [
     { name = "langchain-text-splitters", specifier = ">=1.0.0" },
     { name = "langgraph", specifier = ">=1.0.2" },
     { name = "markdown", specifier = ">=3.10" },
-    { name = "pydantic", specifier = ">=2.12.3" },
     { name = "pymupdf", specifier = ">=1.26.6" },
     { name = "unstructured", specifier = ">=0.18.21" },
 ]
