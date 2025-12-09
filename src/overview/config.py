@@ -1,14 +1,27 @@
 """Configuration module for agent prompts and system settings."""
 
-from typing import Annotated, Final, Sequence, TypedDict
+from typing import Annotated, Final, Sequence
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
+from pydantic import BaseModel, ConfigDict
 
-class BaseState(TypedDict):
+
+class BaseState(BaseModel):
     """Base state structure for agent communication."""
 
-    messages: Annotated[Sequence[BaseMessage], add_messages]
+    messages: Annotated[
+        Sequence[BaseMessage],
+        add_messages,
+    ]
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
 
 
 # Constants for prompt configuration
@@ -92,3 +105,16 @@ Before finalizing any response:
 - [ ] Error handling completed if applicable
 - [ ] All files saved to `{SEARCH_OUTPUT_DIR}`
 """
+
+if __name__ == "__main__":
+    from langchain_core.messages import HumanMessage
+
+    state = BaseState(messages=[HumanMessage(content="Hello")])
+
+    json_str = state.model_dump_json()
+
+    print(json_str)
+
+    state1 = BaseState.model_validate_json(json_str)
+
+    print(state1)
