@@ -225,5 +225,7 @@ class PaperMetaAnalyzer:
 if __name__ == "__main__":
     from pprint import pprint
 
-    result = PaperMetaAnalyzer(file_path="examples/Example/pdf/1706.03762v7.pdf")
-    pprint(result.metadata)
+    paper_info = PaperMetaAnalyzer(
+    file_paths=["examples/Example/pdf/1706.03762v7.pdf"]
+).metadata
+    pprint(paper_info)

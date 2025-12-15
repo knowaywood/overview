@@ -71,7 +71,8 @@ class ArxivSearcher:
         self.max_results = max_results
         self.answer = self.search(query, max_results)
 
-    def search(self, query: str, max_results: int = 5) -> list[BasePaperInfo]:
+    @staticmethod
+    def search(query: str, max_results: int = 5) -> list[BasePaperInfo]:
         """Search papers from arXiv.
 
         Args:
@@ -83,7 +84,7 @@ class ArxivSearcher:
 
         """
         url = (
-            f"{self.base_url}?search_query={query}"
+            f"http://export.arxiv.org/api/query?search_query={query}"
             f"&start=0&max_results={max_results}"
             f"&sortBy=submittedDate&sortOrder=descending"
         )

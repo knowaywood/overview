@@ -15,4 +15,5 @@ def ddgs_search(query_str: str) -> str:
         str: The search results.
 
     """
+    print(f"[+] 搜索查询: {query_str} by DuckDuckGo")
     return search.invoke(query_str)
