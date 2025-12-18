@@ -2,7 +2,7 @@
 
 
 def read_from_local(path: str) -> str | None:
-    """Read file with CLI confirmation."""
+    """Read file from local hard drive with CLI confirmation."""
     confirm = input(f"⚠️  确定要读取文件 '{path}' 吗? (y/n): ")
 
     # 2. 判断输入，如果不是 y 则终止

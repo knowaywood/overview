@@ -6,6 +6,7 @@ from typing import Literal, TypedDict
 import feedparser
 import requests
 from feedparser.util import FeedParserDict
+from overview import config as cfg
 
 
 class BasePaperInfo(TypedDict):
@@ -22,6 +23,20 @@ class BasePaperInfo(TypedDict):
 def download_url(
     pdf_url: str, save_dir: str = "./download", filename: str | None = None
 ) -> str:
+    """Download arxiv paper to local hard drive based on paper url.
+
+    Args:
+        pdf_url (str): papar url
+        save_dir (str, optional): the path to save. Defaults to "./download".
+        filename (str | None, optional): file name . Defaults to None.
+
+    Raises:
+        RuntimeError: _description_
+
+    Returns:
+        str: the path of saved papar
+
+    """
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     if not filename:
@@ -31,7 +46,7 @@ def download_url(
         filename = name
 
     save_path = os.path.join(save_dir, filename)
-
+    abs_save_path = os.path.abspath(save_path)
     print(f"[+] 开始下载: {pdf_url}")
     print(f"[+] 保存路径: {save_path}")
 
@@ -49,6 +64,7 @@ def download_url(
                 for data in response.iter_content(chunk_size=8192):
                     downloaded += len(data)
                     f.write(data)
+        cfg.paper_dowload.append(abs_save_path)
         return save_path
 
     except Exception as e:
@@ -120,7 +136,6 @@ class ArxivSearcher:
                     else "Unknown",
                 )
                 results.append(paperInfo)
-
             return results
 
         except Exception as e:
@@ -155,5 +170,5 @@ class ArxivSearcher:
 
 
 if __name__ == "__main__":
-    search = ArxivSearcher("deep learning")
-    download_info(search[0])
+    search = ArxivSearcher.search("deep learning")
+    print(search)

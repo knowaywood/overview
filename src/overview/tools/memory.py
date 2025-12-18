@@ -10,7 +10,7 @@ from langchain_core.messages import (
 import overview.config as cfg
 
 
-def save(path: str, state: cfg.BaseState) -> None:
+def save_chat(path: str, state: cfg.BaseState) -> None:
     """Save chat memory to hard drive."""
     serialized_messages = messages_to_dict(state["messages"])
 
@@ -23,7 +23,7 @@ def save(path: str, state: cfg.BaseState) -> None:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 
-def resume(path: str) -> cfg.BaseState:
+def resume_chat(path: str) -> cfg.BaseState:
     """Resume chat memory from hard drive."""
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -38,4 +38,4 @@ def resume(path: str) -> cfg.BaseState:
 if __name__ == "__main__":
     from pprint import pprint
 
-    pprint(resume("history.json"))
+    pprint(resume_chat("history.json"))

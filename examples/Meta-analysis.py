@@ -19,8 +19,8 @@ agent = main_agent(
 
 if __name__ == "__main__":
     res = agent.invoke({
-        "messages": "搜索深度学习的发展,将综述的结果保存到本地文件 @/home/dministrator/git_clone/overview/ov.json"
+        "messages": "读取本地文件@/home/dministrator/git_clone/overview/examples/Example/md/1706.03762v7.md,将综述的结果保存到本地文件 @/home/dministrator/git_clone/overview/ov.json"
     })
-    from overview.tools.memory import save
+    from overview.tools.memory import save_chat
 
-    save("history.json", res)
+    save_chat("history.json", res)
