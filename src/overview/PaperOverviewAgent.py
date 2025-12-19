@@ -18,7 +18,6 @@ class AgentState(TypedDict):
     main_query: str
     keywords: list[str]
     search_mess: Sequence[BaseMessage]
-    main_mess: Sequence[BaseMessage]
 
 
 class PaperOverviewAgent:
@@ -27,23 +26,28 @@ class PaperOverviewAgent:
         keywords_model: BaseChatModel,
         search_model: BaseChatModel,
         main_agent: BaseChatModel,
+        summary_agent: BaseChatModel,
     ):
         self.keywords_model = keywords_model
-        self.search_model = search_model
         self.main_agent = self.creat_main_agent(main_agent)
+        self.search_agent = self.creat_search_agent(search_model)
+        self.summary_agent = self.creat_symmary_agent(summary_agent)
 
-        self.search_agent = self.creat_search_agent(self.search_model)
         graph = StateGraph(AgentState)
         graph.add_node("keywords_agent", self.keywords_node)
         graph.add_node("search_agent", self.search_node)
+        graph.add_node("thread_main_agent", self.thread_main_node)
+        graph.add_node("summary_agent", self.summary_node)
 
         graph.add_edge(START, "keywords_agent")
         graph.add_edge("keywords_agent", "search_agent")
-        graph.add_edge("search_agent", END)
+        graph.add_edge("search_agent", "thread_main_agent")
+        graph.add_edge("thread_main_agent", "summary_agent")
+        graph.add_edge("summary_agent", END)
         self.agent = graph.compile()
 
-        # with open("agent_graph.png", "wb") as f:
-        #     f.write(self.agent.get_graph().draw_mermaid_png())
+        with open("agent_graph.png", "wb") as f:
+            f.write(self.agent.get_graph().draw_mermaid_png())
 
     def invoke(self, *args: Any, **kwargs: Any):
         return self.agent.invoke(*args, **kwargs)
@@ -114,7 +118,7 @@ class PaperOverviewAgent:
         chat_path = overview_path.with_name(
             f"{overview_path.stem}_history{overview_path.suffix}"
         )
-        save_chat(str(chat_path), res)
+        # save_chat(str(chat_path), res)
 
     def thread_main_node(self, state: AgentState):
         from concurrent.futures import ThreadPoolExecutor
@@ -127,8 +131,38 @@ class PaperOverviewAgent:
             executor.map(self.thread_task, [self.main_agent] * num, file_paths)
         return state
 
-    def summary_agent(self, model: str | BaseChatModel):
-        pass
+    def creat_symmary_agent(self, model: BaseChatModel):
+        from deepagents import create_deep_agent
+
+        from overview.tools.FS import save2local
+
+        summary_agent = create_deep_agent(
+            model=model, tools=[save2local], system_prompt=cfg.SUMMARY_AGENT_PROMPT
+        )
+        return summary_agent
+
+    def _load_json(self, file_path: list[Path]):
+
+        data = []
+        for i in file_path:
+            with open(i, "r", encoding="utf-8") as f:
+                data.append(f.read())
+        return data
+
+    def summary_node(self, state: AgentState) -> AgentState:
+        summ_path = Path("./download")
+        file_paths = [p.resolve() for p in summ_path.glob("*.json")]
+        data = self._load_json(file_paths)
+        res = self.summary_agent.invoke({
+            "messages": [
+                HumanMessage(content=data),
+                HumanMessage(
+                    content=f"KEYWORDS:{state['keywords']},MAIN_QUERY:{state['main_query']}"
+                ),
+            ]
+        })
+        # save_chat("sy_history.json", res)
+        return state
 
 
 if __name__ == "__main__":
@@ -139,16 +173,20 @@ if __name__ == "__main__":
 
     sub_model = ChatTongyi(model="qwen-max")
     model = ChatGoogleGenerativeAI(model="gemini-2.5-pro")
+    flash_model = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
     paper_agent = PaperOverviewAgent(
-        keywords_model=sub_model, search_model=model, main_agent=model
+        keywords_model=sub_model,
+        search_model=flash_model,
+        main_agent=model,
+        summary_agent=model,
     )
 
-    his = paper_agent.thread_main_node(
-        AgentState(main_query="deeplearning", keywords=[], search_mess=[], main_mess=[])
+    his = paper_agent.invoke(
+        AgentState(main_query="deeplearning", keywords=[], search_mess=[])
     )
-    print(cfg.paper_dowload)
+
 
 # 第一部，根据主题生成关键词
 # 第二步，根据关键词逐一搜索文献，并下载
-# 第三步，逐一读取每篇文献，如果和主题密切相关，则保留并将每其关键内容压缩到一个文档（比如一个json格式）
+# 第三步，逐一读取每篇文献，如果和主题密切相关，则保留并将每其关键内容压缩到一个文档（比如一个json格式） with query
 # 第四步，把压缩后的文档集合起来写成一篇综述文献
