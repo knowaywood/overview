@@ -188,10 +188,12 @@ class DDGSearcher:
         from langchain_community.tools import DuckDuckGoSearchResults
 
         search = DuckDuckGoSearchResults(output_format="list", num_results=max_results)
-        query += " site:arxiv.org filetype:pdf"
+        query = query + " site:arxiv.org filetype:pdf"
         return search.invoke(query)
 
-    def _get_arxiv(self, DDGanswer: list[DDGRes]) -> BasePaperInfo:
+    def _get_arxiv_id(self, DDGanswer: list[DDGRes]) -> list[str]:
+        import re
+
         if not DDGanswer:
             raise ValueError("No result found.")
         arxiv_url_ls = [i["link"] for i in DDGanswer]
@@ -199,24 +201,29 @@ class DDGSearcher:
         if not arxiv_url_ls:
             raise ValueError("No arXiv URL found.")
         url = arxiv_url_ls[0]
-        import re
         match = re.search(r'/pdf/([\d.]+)(?:\.pdf)?$', url)
         if not match:
             raise ValueError(f"无法从URL中提取ArXiv ID: {url}")
         arxiv_id = match.group(1)
+        # 修改为返回list arxiv_id
+        ...
+
+
+    @classmethod
+    def _search_by_id(cls,arxiv_id:str)->BasePaperInfo:
 
         api_url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}"
         try:
             response = requests.get(api_url, timeout=20)
             response.raise_for_status()
-            
+
             feed = feedparser.parse(response.text)
             if not feed.entries:
                 raise ValueError(f"无法找到ArXiv ID对应的论文: {arxiv_id}")
-                
+
             entry = feed.entries[0]
 
-            
+
             authors = [author.name for author in entry.authors] if hasattr(entry, "authors") else []
 
             pdf_url = ""
@@ -224,11 +231,11 @@ class DDGSearcher:
                 if link.type == "application/pdf":
                     pdf_url = link.href
                     break
-            
+
             paper_info = BasePaperInfo(
-                title=entry.title if hasattr(entry, "title") else "",
+                title=entry.title,
                 authors=authors,
-                summary=entry.summary if hasattr(entry, "summary") else "",
+                summary=entry.summary,
                 pdf_url=pdf_url,
                 arxiv_id=arxiv_id,
                 publish_time=entry.published if hasattr(entry, "published") else "Unknown"
@@ -239,8 +246,7 @@ class DDGSearcher:
         except Exception as e:
             raise ValueError(f"搜索过程中出现错误: {e}")
 
-
 if __name__ == "__main__":
     search = DDGSearcher("machine learning")
-    # print(search.answer)
-    print(search._get_arxiv(search.answer))
+    print(search.answer)
+    print(search._get_arxiv_id(search.answer))
