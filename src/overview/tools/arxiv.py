@@ -6,6 +6,7 @@ from typing import Literal, TypedDict
 import feedparser
 import requests
 from feedparser.util import FeedParserDict
+
 from overview import config as cfg
 
 
@@ -82,7 +83,6 @@ class ArxivSearcher:
 
     def __init__(self, query: str, max_results: int = 5) -> None:
         """Initialize the ArxivSearcher."""
-        self.base_url = "http://export.arxiv.org/api/query"
         self.query = query
         self.max_results = max_results
         self.answer = self.search(query, max_results)
@@ -169,6 +169,35 @@ class ArxivSearcher:
         return res
 
 
+class DDGRes(TypedDict):
+    """the return type of DDGSearcher.search."""
+
+    snippet: str
+    title: str
+    link: str
+
+
+class DDGSearcher:
+    def __init__(self, query: str, max_results: int = 5) -> None:
+        self.query = query
+        self.max_results = max_results
+        self.answer = self.search(query, max_results)
+
+    @classmethod
+    def search(cls, query: str, max_results: int = 5) -> list[DDGRes]:
+        from langchain_community.tools import DuckDuckGoSearchResults
+
+        search = DuckDuckGoSearchResults(output_format="list", num_results=max_results)
+        query += " site:arxiv.org filetype:pdf"
+        return search.invoke(query)
+
+    def _get_arxiv(self, DDGanswer: list[DDGRes]) -> BasePaperInfo:
+        arxiv_url_ls = [i["link"] for i in DDGanswer]
+        url = arxiv_url_ls[0]  # for instance : https://arxiv.org/pdf/2310.01077
+        # get BasePaperInfo from the url or the Id:2310.01077
+
+
 if __name__ == "__main__":
-    search = ArxivSearcher.search("deep learning")
-    print(search)
+    search = DDGSearcher("machine learning")
+    # print(search.answer)
+    print(search._get_arxiv(search.answer))

@@ -17,3 +17,11 @@ def ddgs_search(query_str: str) -> str:
     """
     print(f"[+] 搜索查询: {query_str} by DuckDuckGo")
     return search.invoke(query_str)
+
+
+if __name__ == "__main__":
+    res = ddgs_search("""
+                      ("lean manufacturing" OR "lean methodologies") AND ("machine learning" OR "data analysis" OR "process optimization") site:arxiv.org filetype:pdf
+                      """)
+
+    print(res[0])

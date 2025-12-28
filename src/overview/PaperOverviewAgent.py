@@ -1,7 +1,6 @@
 import base64
-from email import message
 from pathlib import Path
-from typing import Any, Sequence, TypedDict, Optional
+from typing import Any, Optional, Sequence, TypedDict
 
 from dotenv import load_dotenv
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -12,6 +11,7 @@ import overview.config as cfg
 
 load_dotenv()
 Path("./summary").mkdir(exist_ok=True)
+
 
 class AgentState(TypedDict):
     """Agent state structure."""
@@ -63,16 +63,21 @@ class PaperOverviewAgent:
         print(state)
 
         from langchain_core.messages import AIMessage
+
         from overview.tools.memory import save_chat
+
         system_msg = SystemMessage(content=cfg.KEYWORD_AGENT_PROMPT)
         human_msg = HumanMessage(content=state["main_query"])
         ai_msg = AIMessage(content=keywords.content)
-        
+
         if "messages" not in state or state["messages"] is None:
             state["messages"] = []
         state["messages"] = list(state["messages"]) + [system_msg, human_msg, ai_msg]
-        
-        save_chat("history/keywords_agent_history.json", {"messages": [system_msg, human_msg, ai_msg]})
+
+        save_chat(
+            "history/keywords_agent_history.json",
+            {"messages": [system_msg, human_msg, ai_msg]},
+        )
         return state
 
     def creat_search_agent(self, model: BaseChatModel):
@@ -96,25 +101,26 @@ class PaperOverviewAgent:
                 ),
             ]
         })
-        
+
         from overview.tools.memory import save_chat
+
         system_msg = SystemMessage(content=cfg.SEARCH_AGENT_PROMPT)
         human_msg = HumanMessage(
             content=f"QUERY:{state['main_query']},KEYWORDS:{state['keywords']}"
         )
-        
+
         if "messages" not in state or state["messages"] is None:
             state["messages"] = []
         search_messages = [system_msg, human_msg] + res["messages"]
         state["messages"] = list(state["messages"]) + search_messages
-        
+
         save_chat("history/search_agent_history.json", {"messages": search_messages})
-        
+
         return {
             "search_mess": res["messages"],
             "main_query": state["main_query"],
             "keywords": state["keywords"],
-            "messages": state["messages"]
+            "messages": state["messages"],
         }
 
     def creat_main_agent(self, model: BaseChatModel):
@@ -158,17 +164,21 @@ class PaperOverviewAgent:
 
         with ThreadPoolExecutor(max_workers=num) as executor:
             executor.map(self.thread_task, [self.main_agent] * num, file_paths)
-        
+
         from langchain_core.messages import SystemMessage
+
         from overview.tools.memory import save_chat
+
         system_msg = SystemMessage(content="论文分析阶段已完成")
-        
+
         if "messages" not in state or state["messages"] is None:
             state["messages"] = []
         state["messages"] = list(state["messages"]) + [system_msg]
-        
-        save_chat("history/paper_analysis_agent_history.json", {"messages": [system_msg]})
-        
+
+        save_chat(
+            "history/paper_analysis_agent_history.json", {"messages": [system_msg]}
+        )
+
         return state
 
     def creat_symmary_agent(self, model: BaseChatModel):
@@ -213,7 +223,7 @@ if __name__ == "__main__":
 
     sub_model = ChatTongyi(model="qwen-max")
     model = ChatGoogleGenerativeAI(model="gemini-2.5-pro")
-    flash_model = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
+    flash_model = ChatGoogleGenerativeAI(model="gemini-2.5-pro")
     paper_agent = PaperOverviewAgent(
         keywords_model=sub_model,
         search_model=flash_model,
@@ -222,7 +232,12 @@ if __name__ == "__main__":
     )
 
     his = paper_agent.invoke(
-        AgentState(main_query="deeplearning", keywords=[], search_mess=[], messages=[])
+        AgentState(
+            main_query="Lean with machine learning",
+            keywords=[],
+            search_mess=[],
+            messages=[],
+        )
     )
 
 
@@ -230,3 +245,4 @@ if __name__ == "__main__":
 # 第二步，根据关键词逐一搜索文献，并下载
 # 第三步，逐一读取每篇文献，如果和主题密切相关，则保留并将每其关键内容压缩到一个文档（比如一个json格式） with query
 # 第四步，把压缩后的文档集合起来写成一篇综述文献
+# 综述加参考文献，丢包，搜不到文献，优化搜索
