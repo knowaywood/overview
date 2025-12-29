@@ -191,23 +191,34 @@ class DDGSearcher:
         query = query + " site:arxiv.org filetype:pdf"
         return search.invoke(query)
 
-    def _get_arxiv_id(self, DDGanswer: list[DDGRes]) -> list[str]:
+    def _get_arxiv_id(self, DDGanswer: list[DDGRes]) -> tuple[list[str], BasePaperInfo]:
         import re
+        try:
+            if not DDGanswer:
+                raise ValueError("No result found.")
+            arxiv_url_ls = [i["link"] for i in DDGanswer if "arxiv.org" in i["link"] and ".pdf" in i["link"]]
+            print(arxiv_url_ls)
+            if not arxiv_url_ls:
+                raise ValueError("No arXiv URL found.")
+            url = arxiv_url_ls[0]
+            arxiv_id_list = []
+            for url in arxiv_url_ls:
+                match = re.search(r'/pdf/([\d.]+)(?:\.pdf)?$', url)
+                if match:
+                    arxiv_id_list.append(match.group(1))
 
-        if not DDGanswer:
-            raise ValueError("No result found.")
-        arxiv_url_ls = [i["link"] for i in DDGanswer]
-        print(arxiv_url_ls)
-        if not arxiv_url_ls:
-            raise ValueError("No arXiv URL found.")
-        url = arxiv_url_ls[0]
-        match = re.search(r'/pdf/([\d.]+)(?:\.pdf)?$', url)
-        if not match:
-            raise ValueError(f"无法从URL中提取ArXiv ID: {url}")
-        arxiv_id = match.group(1)
-        # 修改为返回list arxiv_id
-        ...
+            if not arxiv_id_list:
+                raise ValueError("No ArXiv ID in the links.")
+            
+            first_id = arxiv_id_list[0]
+            paper_info = self._search_by_id(first_id)
+            
+            return arxiv_id_list, paper_info
 
+
+        except ValueError:
+            return [], BasePaperInfo()
+        
 
     @classmethod
     def _search_by_id(cls,arxiv_id:str)->BasePaperInfo:
