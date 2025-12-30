@@ -184,20 +184,83 @@ class DDGSearcher:
         self.answer = self.search(query, max_results)
 
     @classmethod
-    def search(cls, query: str, max_results: int = 5) -> list[DDGRes]:
+    def search(cls, query: str, max_results: int = 5) -> list[BasePaperInfo]:
         from langchain_community.tools import DuckDuckGoSearchResults
 
         search = DuckDuckGoSearchResults(output_format="list", num_results=max_results)
-        query += " site:arxiv.org filetype:pdf"
-        return search.invoke(query)
+        query = query + " site:arxiv.org filetype:pdf"
+        search_answer = search.invoke(query)
+        arxiv_id = cls._get_arxiv_id(search_answer)
+        paper_info = [cls._search_by_id(i) for i in arxiv_id]
+        return paper_info
 
-    def _get_arxiv(self, DDGanswer: list[DDGRes]) -> BasePaperInfo:
-        arxiv_url_ls = [i["link"] for i in DDGanswer]
-        url = arxiv_url_ls[0]  # for instance : https://arxiv.org/pdf/2310.01077
-        # get BasePaperInfo from the url or the Id:2310.01077
+    @classmethod
+    def _get_arxiv_id(cls, ddg_answer: list[DDGRes]) -> list[str]:
+        import re
+
+        if not ddg_answer:
+            raise ValueError("No result found.")
+        arxiv_url_ls = [i["link"] for i in ddg_answer]
+        print(arxiv_url_ls)
+        if not arxiv_url_ls:
+            raise ValueError("No arXiv URL found.")
+        arxiv_id_list = []
+        for url in arxiv_url_ls:
+            match = re.search(r"/pdf/([\d.]+)(?:\.pdf)?$", url)
+            if match:
+                arxiv_id_list.append(match.group(1))
+            else:
+                arxiv_id_list.append("")
+        if not arxiv_id_list:
+            raise ValueError("No ArXiv ID in the links.")
+        return arxiv_id_list
+
+    @classmethod
+    def _search_by_id(cls, arxiv_id: str) -> BasePaperInfo:
+        if arxiv_id == "":
+            return BasePaperInfo()
+        api_url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}"
+        try:
+            response = requests.get(api_url, timeout=20)
+            response.raise_for_status()
+
+            feed = feedparser.parse(response.text)
+            if not feed.entries:
+                print(f"无法找到ArXiv ID对应的论文: {arxiv_id}")
+                return BasePaperInfo()
+
+            entry = feed.entries[0]
+
+            authors = (
+                [author.name for author in entry.authors]
+                if hasattr(entry, "authors")
+                else []
+            )
+
+            pdf_url = ""
+            for link in entry.links:
+                if link.type == "application/pdf":
+                    pdf_url = link.href
+                    break
+
+            paper_info = BasePaperInfo(
+                title=entry.title,
+                authors=authors,
+                summary=entry.summary,
+                pdf_url=pdf_url,
+                arxiv_id=arxiv_id,
+                publish_time=entry.published
+                if hasattr(entry, "published")
+                else "Unknown",
+            )
+
+            return paper_info
+
+        except Exception as e:
+            raise ValueError(f"搜索过程中出现错误: {e}")
 
 
 if __name__ == "__main__":
     search = DDGSearcher("machine learning")
-    # print(search.answer)
-    print(search._get_arxiv(search.answer))
+    print(search.answer)
+    print(search._get_arxiv_id(search.answer))
