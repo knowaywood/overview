@@ -21,7 +21,8 @@ def ddgs_search(query_str: str) -> str:
 
 if __name__ == "__main__":
     res = ddgs_search("""
-                      ("lean manufacturing" OR "lean methodologies") AND ("machine learning" OR "data analysis" OR "process optimization") site:arxiv.org filetype:pdf
+                      ("lean manufacturing" OR "lean methodologies") AND ("machine learning" OR "data analysis" OR "process optimization") site:arxiv.org/abs filetype:pdf
                       """)
+    res = ddgs_search("Lean with machine learning site:arxiv.org/pdf")
 
-    print(res[0])
+    print(res)

@@ -1,6 +1,6 @@
 import base64
 from pathlib import Path
-from typing import Any, Optional, Sequence, TypedDict
+from typing import Any, Sequence, TypedDict
 
 from dotenv import load_dotenv
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -11,6 +11,7 @@ import overview.config as cfg
 
 load_dotenv()
 Path("./summary").mkdir(exist_ok=True)
+Path("./history").mkdir(exist_ok=True)
 
 
 class AgentState(TypedDict):
@@ -18,8 +19,7 @@ class AgentState(TypedDict):
 
     main_query: str
     keywords: list[str]
-    search_mess: Sequence[BaseMessage]
-    messages: Optional[Sequence[BaseMessage]] = ()
+    keywords_mess: Sequence[BaseMessage]
 
 
 class PaperOverviewAgent:
@@ -29,11 +29,17 @@ class PaperOverviewAgent:
         search_model: BaseChatModel,
         main_agent: BaseChatModel,
         summary_agent: BaseChatModel,
+        summ_dir: Path = Path("./summary"),
+        history_dir: Path = Path("./history"),
     ):
         self.keywords_model = keywords_model
         self.main_agent = self.creat_main_agent(main_agent)
         self.search_agent = self.creat_search_agent(search_model)
         self.summary_agent = self.creat_symmary_agent(summary_agent)
+        self.summ_dir = summ_dir
+        self.history_dir = history_dir
+        history_dir.mkdir(exist_ok=True)
+        summ_dir.mkdir(exist_ok=True)
 
         graph = StateGraph(AgentState)
         graph.add_node("keywords_agent", self.keywords_node)
@@ -70,12 +76,16 @@ class PaperOverviewAgent:
         human_msg = HumanMessage(content=state["main_query"])
         ai_msg = AIMessage(content=keywords.content)
 
-        if "messages" not in state or state["messages"] is None:
-            state["messages"] = []
-        state["messages"] = list(state["messages"]) + [system_msg, human_msg, ai_msg]
+        if "keywords_mess" not in state or state["keywords_mess"] is None:
+            state["keywords_mess"] = []
+        state["keywords_mess"] = list(state["keywords_mess"]) + [
+            system_msg,
+            human_msg,
+            ai_msg,
+        ]
 
         save_chat(
-            "history/keywords_agent_history.json",
+            f"{self.history_dir}/keywords_agent_history.json",
             {"messages": [system_msg, human_msg, ai_msg]},
         )
         return state
@@ -84,18 +94,19 @@ class PaperOverviewAgent:
         from langchain.agents import create_agent
 
         from overview.tools.agent_raise import search_raise
-        from overview.tools.arxiv import ArxivSearcher, download_url
+        from overview.tools.arxiv import DDGSearcher, download_url
 
         search_agent = create_agent(
             model=model,
-            tools=[ArxivSearcher.search, download_url, search_raise],
+            tools=[DDGSearcher.search, download_url, search_raise],
+            system_prompt=cfg.SEARCH_AGENT_PROMPT,
         )
         return search_agent
 
     def search_node(self, state: AgentState):
+        print("search_node")
         res = self.search_agent.invoke({
             "messages": [
-                SystemMessage(content=cfg.SEARCH_AGENT_PROMPT),
                 HumanMessage(
                     content=f"QUERY:{state['main_query']},KEYWORDS:{state['keywords']}"
                 ),
@@ -104,24 +115,9 @@ class PaperOverviewAgent:
 
         from overview.tools.memory import save_chat
 
-        system_msg = SystemMessage(content=cfg.SEARCH_AGENT_PROMPT)
-        human_msg = HumanMessage(
-            content=f"QUERY:{state['main_query']},KEYWORDS:{state['keywords']}"
-        )
+        save_chat(f"{self.history_dir}/search_agent_history.json", {"messages": res})
 
-        if "messages" not in state or state["messages"] is None:
-            state["messages"] = []
-        search_messages = [system_msg, human_msg] + res["messages"]
-        state["messages"] = list(state["messages"]) + search_messages
-
-        save_chat("history/search_agent_history.json", {"messages": search_messages})
-
-        return {
-            "search_mess": res["messages"],
-            "main_query": state["main_query"],
-            "keywords": state["keywords"],
-            "messages": state["messages"],
-        }
+        return state
 
     def creat_main_agent(self, model: BaseChatModel):
         from deepagents import create_deep_agent
@@ -136,7 +132,11 @@ class PaperOverviewAgent:
     def thread_task(self, model: BaseChatModel, file_path: str):
         with open(file_path, "rb") as pdf_file:
             pdf_data = base64.b64encode(pdf_file.read()).decode("utf-8")
-        overview_path = Path("./summary") / Path(file_path).with_suffix(".json").name
+        overview_path = self.summ_dir / Path(file_path).with_suffix(".json").name
+        history_path = self.history_dir / Path(file_path).with_suffix(".json").name
+        history_path = history_path.with_name(
+            f"{history_path.stem}_history{history_path.suffix}"
+        )
         message = HumanMessage(
             content=[
                 {
@@ -150,13 +150,12 @@ class PaperOverviewAgent:
             ]
         )
         res = model.invoke({"messages": [message]})
-        chat_path = overview_path.with_name(
-            f"{overview_path.stem}_history{overview_path.suffix}"
-        )
-        save_chat(str(chat_path), res)
+        save_chat(str(history_path), res)
 
     def thread_main_node(self, state: AgentState):
         from concurrent.futures import ThreadPoolExecutor
+
+        print("thread_main_node")
 
         dir_path = Path("./download")
         file_paths = [p.resolve() for p in dir_path.glob("*.pdf")]
@@ -164,21 +163,6 @@ class PaperOverviewAgent:
 
         with ThreadPoolExecutor(max_workers=num) as executor:
             executor.map(self.thread_task, [self.main_agent] * num, file_paths)
-
-        from langchain_core.messages import SystemMessage
-
-        from overview.tools.memory import save_chat
-
-        system_msg = SystemMessage(content="论文分析阶段已完成")
-
-        if "messages" not in state or state["messages"] is None:
-            state["messages"] = []
-        state["messages"] = list(state["messages"]) + [system_msg]
-
-        save_chat(
-            "history/paper_analysis_agent_history.json", {"messages": [system_msg]}
-        )
-
         return state
 
     def creat_symmary_agent(self, model: BaseChatModel):
@@ -200,8 +184,8 @@ class PaperOverviewAgent:
         return data
 
     def summary_node(self, state: AgentState) -> AgentState:
-        summ_path = Path("./download")
-        file_paths = [p.resolve() for p in summ_path.glob("*.json")]
+        print("summary_node")
+        file_paths = [p.resolve() for p in self.summ_dir.glob("*.json")]
         data = self._load_json(file_paths)
         res = self.summary_agent.invoke({
             "messages": [
@@ -211,7 +195,7 @@ class PaperOverviewAgent:
                 ),
             ]
         })
-        save_chat("history/summary_agent_history.json", res)
+        save_chat(f"{self.history_dir}/summary_agent_history.json", res)
         return state
 
 
@@ -235,8 +219,7 @@ if __name__ == "__main__":
         AgentState(
             main_query="Lean with machine learning",
             keywords=[],
-            search_mess=[],
-            messages=[],
+            keywords_mess=[],
         )
     )
 

@@ -1,6 +1,7 @@
 """ "download paper from arxiv."""
 
 import os
+from pathlib import Path
 from typing import Literal, TypedDict
 
 import feedparser
@@ -22,7 +23,7 @@ class BasePaperInfo(TypedDict):
 
 
 def download_url(
-    pdf_url: str, save_dir: str = "./download", filename: str | None = None
+    pdf_url: str, save_dir: Path = Path("./download"), filename: str | None = None
 ) -> str:
     """Download arxiv paper to local hard drive based on paper url.
 
@@ -38,8 +39,7 @@ def download_url(
         str: the path of saved papar
 
     """
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    save_dir.mkdir(exist_ok=True)
     if not filename:
         name = pdf_url.split("/")[-1]
         if not name.endswith(".pdf"):
@@ -185,10 +185,22 @@ class DDGSearcher:
 
     @classmethod
     def search(cls, query: str, max_results: int = 5) -> list[BasePaperInfo]:
+        """Search papers from arXiv.
+
+        Args:
+            query: Search query for papers
+            max_results: Maximum number of results to return
+
+        Returns:
+            List of paper information dictionaries
+
+        """
         from langchain_community.tools import DuckDuckGoSearchResults
 
         search = DuckDuckGoSearchResults(output_format="list", num_results=max_results)
-        query = query + " site:arxiv.org filetype:pdf"
+        query = query + " site:arxiv.org/pdf"
+
+        print(f"[+] 搜索查询: {query}")
         search_answer = search.invoke(query)
         arxiv_id = cls._get_arxiv_id(search_answer)
         paper_info = [cls._search_by_id(i) for i in arxiv_id]
@@ -201,15 +213,15 @@ class DDGSearcher:
         if not ddg_answer:
             raise ValueError("No result found.")
         arxiv_url_ls = [i["link"] for i in ddg_answer]
-        print(arxiv_url_ls)
         if not arxiv_url_ls:
             raise ValueError("No arXiv URL found.")
         arxiv_id_list = []
         for url in arxiv_url_ls:
-            match = re.search(r"/pdf/([\d.]+)(?:\.pdf)?$", url)
+            match = re.search(r"/pdf/([\d.v]+)(?:\.pdf)?$", url)
             if match:
                 arxiv_id_list.append(match.group(1))
             else:
+                print(f"{url}无法匹配到ArXiv ID")
                 arxiv_id_list.append("")
         if not arxiv_id_list:
             raise ValueError("No ArXiv ID in the links.")
