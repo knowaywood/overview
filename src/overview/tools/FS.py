@@ -39,5 +39,18 @@ def save2local(path: str, context: str) -> None:
         print(f"✅ 文件 '{path}' 写入成功。")
 
 
+def save2local_no_confirm(path: str, context: str) -> None:
+    """Save file to local hard drive with CLI confirmation.
+
+    Args:
+        path (str): file path
+        context (str): context to save
+
+    """
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(context)
+        print(f"✅ 文件 '{path}' 写入成功。")
+
+
 if __name__ == "__main__":
     save_file("test.txt", "hello world")

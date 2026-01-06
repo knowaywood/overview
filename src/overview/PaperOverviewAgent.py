@@ -1,4 +1,5 @@
 import base64
+import uuid
 from pathlib import Path
 from typing import Any, Sequence, TypedDict
 
@@ -32,14 +33,16 @@ class PaperOverviewAgent:
         summ_dir: Path = Path("./summary"),
         history_dir: Path = Path("./history"),
     ):
+        self.uuid = self._get_short_uuid()
+
         self.keywords_model = keywords_model
         self.main_agent = self.creat_main_agent(main_agent)
         self.search_agent = self.creat_search_agent(search_model)
         self.summary_agent = self.creat_symmary_agent(summary_agent)
-        self.summ_dir = summ_dir
-        self.history_dir = history_dir
-        history_dir.mkdir(exist_ok=True)
-        summ_dir.mkdir(exist_ok=True)
+        self.summ_dir = summ_dir / self.uuid
+        self.history_dir = history_dir / self.uuid
+        self.history_dir.mkdir(exist_ok=True, parents=True)
+        self.summ_dir.mkdir(exist_ok=True, parents=True)
 
         graph = StateGraph(AgentState)
         graph.add_node("keywords_agent", self.keywords_node)
@@ -115,33 +118,35 @@ class PaperOverviewAgent:
 
         from overview.tools.memory import save_chat
 
-        save_chat(f"{self.history_dir}/search_agent_history.json", {"messages": res})
+        save_chat(f"{self.history_dir}/search_agent_history.json", res)
 
         return state
 
     def creat_main_agent(self, model: BaseChatModel):
         from deepagents import create_deep_agent
 
-        from overview.tools.FS import save2local
+        from overview.tools.FS import save2local_no_confirm
 
         main_agent = create_deep_agent(
-            model=model, tools=[save2local], system_prompt=cfg.MAIN_AGENT_PROMPT
+            model=model,
+            tools=[save2local_no_confirm],
+            system_prompt=cfg.MAIN_AGENT_PROMPT,
         )
         return main_agent
 
     def thread_task(self, model: BaseChatModel, file_path: str):
+        from overview.tools.memory import save_chat
+
         with open(file_path, "rb") as pdf_file:
             pdf_data = base64.b64encode(pdf_file.read()).decode("utf-8")
-        overview_path = self.summ_dir / Path(file_path).with_suffix(".json").name
-        history_path = self.history_dir / Path(file_path).with_suffix(".json").name
-        history_path = history_path.with_name(
-            f"{history_path.stem}_history{history_path.suffix}"
-        )
+        stem_name = Path(file_path).stem
+        overview_path = self.summ_dir / f"{stem_name}.json"
+        history_path = self.history_dir / f"{stem_name}_history.json"
         message = HumanMessage(
             content=[
                 {
                     "type": "text",
-                    "text": f"read the pdf file and analyze its main content。save it overview in {overview_path} use tool save2local.",
+                    "text": f"read the pdf file and analyze its main content。save it overview in {overview_path} use tool save2local_no_confirm.",
                 },
                 {
                     "type": "image_url",
@@ -162,16 +167,20 @@ class PaperOverviewAgent:
         num = len(file_paths)
 
         with ThreadPoolExecutor(max_workers=num) as executor:
-            executor.map(self.thread_task, [self.main_agent] * num, file_paths)
+            executor.map(
+                self.thread_task, [self.main_agent] * num, file_paths, timeout=80
+            )
         return state
 
     def creat_symmary_agent(self, model: BaseChatModel):
         from deepagents import create_deep_agent
 
-        from overview.tools.FS import save2local
+        from overview.tools.FS import save2local_no_confirm
 
         summary_agent = create_deep_agent(
-            model=model, tools=[save2local], system_prompt=cfg.SUMMARY_AGENT_PROMPT
+            model=model,
+            tools=[save2local_no_confirm],
+            system_prompt=cfg.SUMMARY_AGENT_PROMPT,
         )
         return summary_agent
 
@@ -184,6 +193,8 @@ class PaperOverviewAgent:
         return data
 
     def summary_node(self, state: AgentState) -> AgentState:
+        from overview.tools.memory import save_chat
+
         print("summary_node")
         file_paths = [p.resolve() for p in self.summ_dir.glob("*.json")]
         data = self._load_json(file_paths)
@@ -198,12 +209,15 @@ class PaperOverviewAgent:
         save_chat(f"{self.history_dir}/summary_agent_history.json", res)
         return state
 
+    def _get_short_uuid(self) -> str:
+        uuid_l = uuid.uuid4()
+        uuid_ls = str(uuid_l).split("-")
+        return uuid_ls[0]
+
 
 if __name__ == "__main__":
     from langchain_community.chat_models import ChatTongyi
     from langchain_google_genai import ChatGoogleGenerativeAI
-
-    from overview.tools.memory import save_chat
 
     sub_model = ChatTongyi(model="qwen-max")
     model = ChatGoogleGenerativeAI(model="gemini-2.5-pro")
@@ -228,4 +242,4 @@ if __name__ == "__main__":
 # 第二步，根据关键词逐一搜索文献，并下载
 # 第三步，逐一读取每篇文献，如果和主题密切相关，则保留并将每其关键内容压缩到一个文档（比如一个json格式） with query
 # 第四步，把压缩后的文档集合起来写成一篇综述文献
-# 综述加参考文献，丢包，搜不到文献，优化搜索
+# 综述加参考文献，丢包，搜不到文献，优化搜索，sub dir

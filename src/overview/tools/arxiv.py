@@ -217,9 +217,12 @@ class DDGSearcher:
             raise ValueError("No arXiv URL found.")
         arxiv_id_list = []
         for url in arxiv_url_ls:
-            match = re.search(r"/pdf/([\d.v]+)(?:\.pdf)?$", url)
-            if match:
-                arxiv_id_list.append(match.group(1))
+            match1 = re.search(r"/pdf/([\d.v]+)(?:\.pdf)?$", url)
+            match2 = re.search(r"/html/([\d.v]+)(?:\.pdf)?$", url)
+            if match1:
+                arxiv_id_list.append(match1.group(1))
+            elif match2:
+                arxiv_id_list.append(match2.group(1))
             else:
                 print(f"{url}无法匹配到ArXiv ID")
                 arxiv_id_list.append("")
